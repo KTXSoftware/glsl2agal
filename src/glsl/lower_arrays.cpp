@@ -126,7 +126,9 @@ ir_array_decomposer_visitor::visit(ir_variable *ir)
          sprintf(&nm[0], "%s_%d", ir->name, n);
          ir_variable *newvar = new (ctx) ir_variable(glsl_type::vec4_type, ralloc_strdup(ctx, &nm[0]), (ir_variable_mode)ir->mode, (glsl_precision)ir->precision);
          newvar->parent = ir;
-         newvar->location = n;
+				 ir->child[n] = newvar;
+				 newvar->usedAsAMatrixComponent = true;				 
+         newvar->location = n;				 
          base_ir->insert_after(newvar);
          hash_table_insert(varhash, newvar, ralloc_strdup(ctx, &nm[0]));
       }

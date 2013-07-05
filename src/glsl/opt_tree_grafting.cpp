@@ -76,8 +76,8 @@ public:
    virtual ir_visitor_status visit_enter(class ir_loop *);
    virtual ir_visitor_status visit_enter(class ir_swizzle *);
    virtual ir_visitor_status visit_enter(class ir_texture *);
-
-   bool do_graft(ir_rvalue **rvalue);
+	 
+   bool do_graft(ir_rvalue **rvalue, bool isANormalize = false);
 
    bool progress;
    ir_variable *graft_var;
@@ -113,7 +113,7 @@ dereferences_variable(ir_instruction *ir, ir_variable *var)
 }
 
 bool
-ir_tree_grafting_visitor::do_graft(ir_rvalue **rvalue)
+ir_tree_grafting_visitor::do_graft(ir_rvalue **rvalue, bool isANormalize)
 {
    if (!*rvalue)
       return false;
@@ -125,7 +125,10 @@ ir_tree_grafting_visitor::do_graft(ir_rvalue **rvalue)
 
    glsl_precision rvl_prec = deref->get_precision();
    glsl_precision rhs_prec = this->graft_assign->rhs->get_precision();
-   if (rvl_prec != rhs_prec && rvl_prec != glsl_precision_undefined && rhs_prec != glsl_precision_undefined)
+	 // Prevent normalize(uniform), it's prohibited in agal
+	 // TODO sin,cos,neg,sat,abs,exp,log,rsq,sqt,frc,rcp
+	 ir_variable* rhs = this->graft_assign->rhs->variable_referenced();
+   if ((rvl_prec != rhs_prec && rvl_prec != glsl_precision_undefined && rhs_prec != glsl_precision_undefined) || (isANormalize && rhs != NULL && rhs->mode == ir_var_uniform))
 	   return false;
 
    if (debug) {
@@ -205,6 +208,14 @@ ir_visitor_status
 ir_tree_grafting_visitor::visit_enter(ir_call *ir)
 {
    exec_list_iterator sig_iter = ir->get_callee()->parameters.iterator();
+
+	 exec_list param = ir->get_callee()->parameters;
+	 bool isANormalize = false;
+	 if (!param.is_empty() && (param.get_head() == param.tail_pred) && strcmp(ir->get_callee()->function_name(), "normalize") == 0)
+	 {
+		 isANormalize = true;
+	 }
+
    /* Reminder: iterating ir_call iterates its parameters. */
    foreach_iter(exec_list_iterator, iter, *ir) {
       ir_variable *sig_param = (ir_variable *)sig_iter.get();
@@ -214,7 +225,7 @@ ir_tree_grafting_visitor::visit_enter(ir_call *ir)
       if (sig_param->mode != ir_var_in && sig_param->mode != ir_var_const_in)
 	 continue;
 
-      if (do_graft(&new_ir)) {
+      if (do_graft(&new_ir, isANormalize)) {
 	 ir->replace_with(new_ir);
 	 return visit_stop;
       }

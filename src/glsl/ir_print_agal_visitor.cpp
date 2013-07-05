@@ -78,7 +78,8 @@ public:
 		globals = globals_;
 		mode = mode_;
 		state = _state;
-		use_precision = false;		
+		use_precision = false;
+		isArrayIndex = false;
 	}
 
 	virtual ~ir_print_agal_visitor()
@@ -113,6 +114,7 @@ public:
 	PrintGlslMode mode;
 	bool	use_precision;
 	_mesa_glsl_parse_state *state;
+	bool isArrayIndex;
 	
 };
 
@@ -468,6 +470,13 @@ void ir_print_agal_visitor::visit(ir_swizzle *ir)
 
    ralloc_asprintf_append (&buffer, ".");
 
+	 // Special case for array index, just use .x instead of .xxxx
+	 if (isArrayIndex)
+	 {
+		 ralloc_asprintf_append(&buffer, "%c", "xyzw"[swiz[0]]);
+		 return;
+	 }
+
    int p=0;
    for (unsigned i = 0; i < 4; i++) {
 		ralloc_asprintf_append (&buffer, "%c", "xyzw"[swiz[p]]);
@@ -487,8 +496,18 @@ void ir_print_agal_visitor::visit(ir_dereference_array *ir)
 {
    ir->array->accept(this);
    ralloc_asprintf_append (&buffer, "[");
+	 isArrayIndex = true;
    ir->array_index->accept(this);
-   ralloc_asprintf_append (&buffer, "]");
+	 isArrayIndex = false;
+
+	 if (ir->constantOffset == 0)
+	 {
+		 ralloc_asprintf_append (&buffer, "]");
+	 }
+	 else
+	 {
+		 ralloc_asprintf_append (&buffer, "+%d]", ir->constantOffset);
+	 }
 }
 
 int countElements(ir_instruction *ir)
@@ -506,7 +525,7 @@ int countElements(ir_instruction *ir)
 	}
 }
 
-int min(int x, int y) { return x < y ? x : y; }
+//int min(int x, int y) { return x < y ? x : y; }
 
 static void computeSwizzle(char *swizbuf, ir_assignment *ir)
 {
@@ -527,6 +546,10 @@ static void computeSwizzle(char *swizbuf, ir_assignment *ir)
 
    strcpy(swizbuf, &mask[0]);
 }
+
+#include <vector>
+#include <algorithm>
+extern std::vector<ir_variable*> matrixAssignement;
 
 void ir_print_agal_visitor::visit(ir_assignment *ir)
 {
@@ -556,7 +579,8 @@ void ir_print_agal_visitor::visit(ir_assignment *ir)
 	if(strlen(mask) < 4 && ir->lhs->as_dereference_variable()) {
 		ir_dereference_variable *dv = ir->lhs->as_dereference_variable();
 		ir_variable *var =  dv->variable_referenced();
-		if(var->mode == ir_var_out && !hash_table_find(globals->fullywritten, var)) {
+
+		if((var->mode == ir_var_out || (var->mode == ir_var_temporary && var->usedAsAMatrixComponent)) && !hash_table_find(globals->fullywritten, var)) {				
 			// this out param hasn't been written too yet
 			// as a terrible hack we fully write to all components using
 			// whatever is in the first constant var
@@ -601,6 +625,12 @@ void ir_print_agal_visitor::visit(ir_assignment *ir)
 
 				if(var1) {
 					int sz = var1->component_slots();
+
+					if (ir->withMatrixComponentSlotNbr > 0 && std::find(matrixAssignement.begin(), matrixAssignement.end(), var1) != matrixAssignement.end())
+					{
+						sz = ir->withMatrixComponentSlotNbr;
+					}
+
 					switch(sz) {
 						case 9:
 						case 12:
@@ -618,6 +648,12 @@ void ir_print_agal_visitor::visit(ir_assignment *ir)
 				}
 				if(var2) {
 					int sz = var2->component_slots();
+
+					if (ir->withMatrixComponentSlotNbr > 0 && std::find(matrixAssignement.begin(), matrixAssignement.end(), var2) != matrixAssignement.end())
+					{
+						sz = ir->withMatrixComponentSlotNbr;
+					}
+
 					switch(sz) {
 						case 9:
 						case 12:

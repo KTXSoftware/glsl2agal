@@ -175,8 +175,14 @@ struct exec_node {
       replacement->prev = this->prev;
       replacement->next = this->next;
 
-      this->prev->next = replacement;
-      this->next->prev = replacement;
+			if (this->prev != NULL)
+			{
+				this->prev->next = replacement;
+			}
+			if (this->next != NULL)
+			{
+				this->next->prev = replacement;
+			}
    }
 
    /**

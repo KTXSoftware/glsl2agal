@@ -418,6 +418,20 @@ public:
    // Array elements are decomposed into synthetic child variables
    // They must remember their parent so they get correctly named.
    ir_variable *parent;
+	 
+	 // AGAL specific	 
+	 // The parent must remember its childs too so they don't get trashed
+	 // before being needed.
+	 ir_variable* child[4];
+
+	 // We need to remember that when mapping agal register because the m33 opcode
+	 // require a 3x4 matrix. Using a not fully initialized vector result in a
+	 // compiling error.
+	 // http://helpx.adobe.com/flash-player/kb/agal-command-m33-requires-3x4.html
+	 bool usedAsAMatrixComponent;
+
+
+	 bool usedAsAReplacementVarForAMatrixComponent;
 
    /**
     * Built-in state that backs this uniform
@@ -770,6 +784,8 @@ public:
     * Optional condition for the assignment.
     */
    ir_rvalue *condition;
+
+	 unsigned int withMatrixComponentSlotNbr;
 
 
    /**
@@ -1505,6 +1521,8 @@ public:
 
    ir_rvalue *array;
    ir_rvalue *array_index;
+	 // vc1[vt5.x] is prohibited, it needs to be vc[vt5.x+1]. So keep track of the constant offset
+	 unsigned int constantOffset;	 
 
 private:
    void set_array(ir_rvalue *value);

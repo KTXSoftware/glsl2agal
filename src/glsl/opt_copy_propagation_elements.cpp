@@ -232,7 +232,10 @@ ir_copy_propagation_elements_visitor::handle_rvalue(ir_rvalue **ir)
    foreach_iter(exec_list_iterator, iter, *this->acp) {
       acp_entry *entry = (acp_entry *)iter.get();
 
-      if (var == entry->lhs) {
+			// Prevent operation like normalize(uniform), it's prohibited in agal
+			// This will let pass some other valid optimisations, but they should get caught later so no big deal.
+			// TODO sin,cos,neg,sat,abs,exp,log,rsq,sqt,frc,rcp
+      if (var == entry->lhs && entry->rhs->mode != ir_var_uniform) {
 	 for (int c = 0; c < chans; c++) {
 	    if (entry->write_mask & (1 << swizzle_chan[c])) {
 	       source[c] = entry->rhs;

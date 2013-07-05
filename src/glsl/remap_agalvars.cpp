@@ -53,6 +53,8 @@ public:
    std::list<std::string> varyingNames;
    bool namesAreSorted;
 
+	 ir_dereference_array* currentDarr;
+
    ir_remap_agalvars_visitor(PrintGlslMode _mode, hash_table *_oldnames)
    {
       oldnames = _oldnames;
@@ -64,10 +66,12 @@ public:
       useNewSyntax = false;
       memset(&agalName[0], 0, sizeof(agalName));
       namesAreSorted = false;
+			currentDarr = NULL;
    }
 
    char agalName[512];
    void computeAgalName(ir_variable *var);
+	 void computeAgalMatrix();
    int computeStableAgalVaryingName(ir_variable *ir);
 
    virtual ir_visitor_status visit(ir_dereference_variable *);
@@ -109,13 +113,18 @@ int ir_remap_agalvars_visitor::computeStableAgalVaryingName(ir_variable *ir)
    }
 }
 
+#include <vector>
+extern std::vector<ir_variable*> matrixAssignement;
+
 void ir_remap_agalvars_visitor::computeAgalName(ir_variable *ir)
 {
    const char *oldname = (const char*)hash_table_find(oldnames, ir->name);
-   if(hash_table_find(oldnames, ir->name)) {
-      strcpy(&agalName[0], oldname);
+	 if (oldname)
+	 {
+   //if(hash_table_find(oldnames, ir->name)) {
+      strcpy(&agalName[0], oldname);			
       return;
-   }
+   }	
 
    // parent must be allocated before any synthetic children
    if(ir->parent)
@@ -190,7 +199,19 @@ void ir_remap_agalvars_visitor::computeAgalName(ir_variable *ir)
          case ir_var_temporary: sprintf(&agalName[0], "vt%d", ir->location); break;
          case ir_var_in      :  sprintf(&agalName[0], "va%d", ir->location); break;
          case ir_var_out     :  sprintf(&agalName[0], useNewSyntax ? "vi%d" : "v%d", ir->location); break;
-         case ir_var_uniform :  sprintf(&agalName[0], "vc%d", ir->location); break;
+         case ir_var_uniform :
+				 {
+					 if (ir->type->is_array())
+					 {
+						 sprintf(&agalName[0], "vc");						 
+						 currentDarr->constantOffset = ir->location;
+					 }					
+					 else
+					 {
+						 sprintf(&agalName[0], "vc%d", ir->location);
+					 }
+					 break;
+				 }
          default: fprintf(stderr, "unknown v mode %d\n", ir->mode); abort();
       }
    } else if(this->mode == kPrintGlslFragment) {
@@ -224,7 +245,7 @@ void ir_remap_agalvars_visitor::handleDeref(ir_variable **varloc)
       //fprintf(stderr, "remapping deref -- %s\n", glvar->name);
    } else if(glvar->name[0] == 'g' && glvar->name[1] == 'l' && glvar->name[2] == '_') {
       computeAgalName(glvar);
-      agalvar = new (glvar) ir_variable(glvar->type, ralloc_strdup(glvar, &agalName[0]), (ir_variable_mode)glvar->mode, (glsl_precision)glvar->precision);
+      agalvar = new (glvar) ir_variable(glvar->type, ralloc_strdup(glvar, &agalName[0]), (ir_variable_mode)glvar->mode, (glsl_precision)glvar->precision);			
       hash_table_insert(varhash, agalvar, ralloc_strdup(agalvar, glvar->name));
       hash_table_insert(varhash, agalvar, ralloc_strdup(agalvar, &agalName[0]));
       hash_table_insert(renamedvars, glvar, glvar);
@@ -232,6 +253,10 @@ void ir_remap_agalvars_visitor::handleDeref(ir_variable **varloc)
       *varloc = agalvar;
       //fprintf(stderr, "renaming: %s -> %s\n", glvar->name, &agalName[0]);
    } else if (hash_table_find(renamedvars, glvar)) {
+			if (currentDarr != NULL)
+			{
+				currentDarr->constantOffset = glvar->location;
+			}			
       // already renamed
    } else {
       computeAgalName(glvar);
@@ -253,6 +278,7 @@ ir_remap_agalvars_visitor::visit(ir_dereference_variable *ir)
 ir_visitor_status
 ir_remap_agalvars_visitor::visit_enter(ir_dereference_array *ir)
 {
+	 currentDarr = ir;
    ir_dereference_variable *dv = ir->array->as_dereference_variable();
 
    if(dv) {
@@ -261,15 +287,33 @@ ir_remap_agalvars_visitor::visit_enter(ir_dereference_array *ir)
       fprintf(stderr, "REMAP DEREF ARRAY FAILED\n");
    }
 
+	 currentDarr = NULL;
+
    return visit_continue;
+}
+
+void ir_remap_agalvars_visitor::computeAgalMatrix()
+{
+	for (std::vector<ir_variable*>::iterator it = matrixAssignement.begin() ; it != matrixAssignement.end(); ++it)
+	{
+		if (*it != NULL)
+		{
+			computeAgalName(*it);
+		}
+	}
 }
 
 hash_table*
 do_remap_agalvars(exec_list *instructions, int mode)
 {
-   hash_table *oldnames = hash_table_ctor(0, hash_table_string_hash, hash_table_string_compare);
+   hash_table *oldnames = hash_table_ctor(0, hash_table_string_hash, hash_table_string_compare);	 
 
    ir_remap_agalvars_visitor v((PrintGlslMode)mode, oldnames);
+
+	 // Make sure all matrix vector replacement instruction use consecutive registers
+	 // We need to do that first	 
+		v.computeAgalMatrix();
+
    v.run(instructions);
 
    return oldnames;

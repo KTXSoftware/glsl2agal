@@ -27,6 +27,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "replaceInstruction.h"
 #include <vector>
 
+std::vector<ir_variable*> matrixAssignement;
+
 // ===================================================================================
  // ===================================================================================
 
@@ -64,13 +66,13 @@ ir_visitor_status ir_liverange_visitor::handleDereference(ir_dereference *d)
 
    if(!hash_table_find(firstUse, var)) {
       hash_table_insert(firstUse, d, var);
-     // fprintf(stderr, "=== ir_dereference_variable firstUse %p %p : %s ===\n", var, d, var->name);
+      fprintf(stderr, "=== ir_dereference_variable firstUse %p %p : %s ===\n", var, d, var->name);
    }
 
    if(hash_table_find(lastUse, var))
       hash_table_remove(lastUse, var);
    hash_table_insert(lastUse, d, var);
-   //fprintf(stderr, "=== ir_dereference_variable lastUse %p %p : %s ===\n", var, d, var->name);
+   fprintf(stderr, "=== ir_dereference_variable lastUse %p %p : %s ===\n", var, d, var->name);
 
    return visit_continue;
 }
@@ -121,10 +123,10 @@ ir_coalesce_temps_visitor::handleDereference(ir_dereference *ir)
    if(!(var->mode == ir_var_auto || var->mode == ir_var_temporary))
       return visit_continue;
 
-   //fprintf(stderr, "=== ir_dereference_variable %p %s ===\n", var, var->name);
+   fprintf(stderr, "=== ir_dereference_variable %p %s ===\n", var, var->name);
 
    if(hash_table_find(firstUse, var) == ir) {
-      //fprintf(stderr, "Variable %s defined\n", var->name);
+      fprintf(stderr, "Variable %s defined\n", var->name);
       bool allocated = false;
       for(int i=0; i<nAgalTemps; i++) {
          if(tempSlotsUsage[i] == 0) {
@@ -135,42 +137,117 @@ ir_coalesce_temps_visitor::handleDereference(ir_dereference *ir)
          }
       }
 
-      for(int i=0; i<nAgalTemps; i++) {
-         if(deadVars[i] != NULL) {
-            //fprintf(stderr, "Variable %s sharing %s\n", var->name, deadVars[i]->name);
-            hash_table_insert(replaceVars, deadVars[i], var);
-            deadVars[i] = NULL;
-            break;
-         }
-      }
+			// Matrix should use first representative vector instead
+			if (var->type->is_matrix() && var->child[0] != NULL)
+			{
+				if (base_ir->ir_type == ir_type_assignment)
+				{
+					// We need to remember that later during the opcode mapping so we can get an mXY instead of a mul
+					base_ir->as_assignment()->withMatrixComponentSlotNbr = var->component_slots();
+				}
 
-      //if(!allocated)
-      //   fprintf(stderr, "Variable %s NOT ALLOCATED!!!!\n", var->name);
+				ir_variable *replacement = (ir_variable*)hash_table_find(replaceVars, var->child[0]);
+				if (replacement == NULL)
+				{
+					fprintf(stderr, "Variable %s sharing %s\n", var->name, var->child[0]->name);
+					hash_table_insert(replaceVars, var->child[0], var);
+				}
+				else
+				{
+					hash_table_insert(replaceVars, replacement, var);
+				}
+			}			
+			else
+			{
+				for(int i=0; i<nAgalTemps; i++) {
+					 if(deadVars[i] != NULL && !(deadVars[i]->usedAsAReplacementVarForAMatrixComponent && var->parent != NULL && var->parent->type->is_matrix())) {
+							fprintf(stderr, "Variable %s sharing %s\n", var->name, deadVars[i]->name);
+							hash_table_insert(replaceVars, deadVars[i], var);
+
+							if (var->usedAsAMatrixComponent)
+							{
+								deadVars[i]->usedAsAMatrixComponent = var->usedAsAMatrixComponent;
+							}
+
+							deadVars[i] = NULL;
+							break;
+					 }
+				}
+			}
+
+      if(!allocated)
+         fprintf(stderr, "Variable %s NOT ALLOCATED!!!!\n", var->name);
    }
       
 
-   if(hash_table_find(lastUse, var) == ir) {
-      //fprintf(stderr, "Variable %s killed\n", var->name);
+   if((var->parent == NULL || !(var->parent->type->is_matrix())) && hash_table_find(lastUse, var) == ir) {
+      fprintf(stderr, "Variable %s killed\n", var->name);
       bool allocated = false;
 
-      for(int i=0; i<nAgalTemps; i++) {
-         if(tempSlotVarAssignments[i][0] == var) {
-            tempSlotsUsage[i] = 0;
-            tempSlotVarAssignments[i][0] = NULL;
-            allocated = true;
-            break;
-         }
-      }
+			// Kill the childs
+			if (var->type->is_matrix())
+			{
+				for (int i = 0; i < 4; i++)
+				{
+					if (var->child[i] != NULL)
+					{
+						fprintf(stderr, "Variable %s killed\n", var->child[i]->name);
 
-      ir_variable *replacement = (ir_variable*)hash_table_find(replaceVars, var);
-      for(int i=0; i<nAgalTemps; i++) {
-         if(deadVars[i] == NULL) {
-            deadVars[i] = replacement ? replacement : var;
-            break;
-         }
-      }
-      //if(!allocated)
-      //   fprintf(stderr, "Variable %s NOT ALLOCATED!!!!\n", var->name);
+						for(int j=0; j<nAgalTemps; j++)
+						{
+							if(tempSlotVarAssignments[j][0] == var->child[i])
+							{
+								tempSlotsUsage[j] = 0;
+								tempSlotVarAssignments[j][0] = NULL;
+								allocated = true;
+								break;
+							}
+						}
+
+						ir_variable *replacement = (ir_variable*)hash_table_find(replaceVars, var->child[i]);
+						for(int j=0; j<nAgalTemps; j++)
+						{
+							 if(deadVars[j] == NULL)
+							 {
+									var->child[i]->parent = NULL;
+									deadVars[j] = replacement ? replacement : var->child[i];
+									// Mark var if it is used to represent a local matrix
+									// because we don't allow matrix to share register.
+									deadVars[j]->usedAsAReplacementVarForAMatrixComponent = true;																		
+									break;
+							 }
+						}
+
+						matrixAssignement.push_back(replacement ? replacement : var->child[i]);
+					}
+					else
+					{
+						matrixAssignement.push_back(NULL);
+					}
+				}
+			}
+			else
+			{
+				for(int i=0; i<nAgalTemps; i++) {
+					 if(tempSlotVarAssignments[i][0] == var) {
+							tempSlotsUsage[i] = 0;
+							tempSlotVarAssignments[i][0] = NULL;
+							allocated = true;
+							break;
+					 }
+				}
+
+				ir_variable *replacement = (ir_variable*)hash_table_find(replaceVars, var);
+				for(int i=0; i<nAgalTemps; i++) {
+					 if(deadVars[i] == NULL)
+					 {
+							deadVars[i] = replacement ? replacement : var;						
+							break;
+					 }
+				}
+				if(!allocated)
+					 fprintf(stderr, "Variable %s NOT ALLOCATED!!!!\n", var->name);
+			}
    }
    
    return visit_continue;

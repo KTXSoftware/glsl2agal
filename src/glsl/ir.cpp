@@ -1066,6 +1066,7 @@ ir_dereference_array::ir_dereference_array(ir_rvalue *value,
    this->ir_type = ir_type_dereference_array;
    this->array_index = array_index;
    this->set_array(value);
+	 this->constantOffset = 0;
 }
 
 
@@ -1078,6 +1079,7 @@ ir_dereference_array::ir_dereference_array(ir_variable *var,
    this->ir_type = ir_type_dereference_array;
    this->array_index = array_index;
    this->set_array(new(ctx) ir_dereference_variable(var));
+	 this->constantOffset = 0;	 
 }
 
 
@@ -1387,6 +1389,8 @@ ir_variable::ir_variable(const struct glsl_type *type, const char *name,
    this->pixel_center_integer = false;
    this->depth_layout = ir_depth_layout_none;
    this->used = false;
+	 this->usedAsAMatrixComponent = false;
+	 this->usedAsAReplacementVarForAMatrixComponent = false;
 
    if (type && type->base_type == GLSL_TYPE_SAMPLER)
       this->read_only = true;

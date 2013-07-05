@@ -180,7 +180,14 @@ _mesa_print_ir_glsl(exec_list *instructions,
 		ir_variable *var = static_cast<ir_variable*>(ir);
 		if (strstr(var->name, "gl_") == var->name)
 			continue;
+
+		ralloc_asprintf_append(&buffer, " %s", var->used == 1 ? "true\n": "false\n");
 	  }
+		else if (ir->ir_type == ir_type_dereference_variable)
+		{
+			ir_dereference_variable *var = static_cast<ir_dereference_variable*>(ir);
+			ralloc_asprintf_append(&buffer, " %s", var->var->used == 1 ? "true\n": "false\n");
+		}
 
 	  ir_print_glsl_visitor v (buffer, &gtracker, mode, state->es_shader);
 	  ir->accept(&v);
