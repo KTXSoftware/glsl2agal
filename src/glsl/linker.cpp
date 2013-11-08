@@ -1088,7 +1088,7 @@ add_uniform(void *mem_ctx, exec_list *uniforms, struct hash_table *ht,
 	 n->u = (gl_uniform *) calloc(1, sizeof(struct gl_uniform));
 	 n->slots = vec4_slots;
 
-	 n->u->Name = strdup(name);
+	 n->u->Name = _strdup(name);
 	 n->u->Type = type;
 	 n->u->VertPos = -1;
 	 n->u->FragPos = -1;

@@ -337,7 +337,7 @@ _mesa_symbol_table_add_symbol(struct _mesa_symbol_table *table,
 
     if (hdr == NULL) {
        hdr = calloc(1, sizeof(*hdr));
-       hdr->name = strdup(name);
+       hdr->name = _strdup(name);
 
        hash_table_insert(table->ht, hdr, hdr->name);
        hdr->next = table->hdr;
@@ -394,7 +394,7 @@ _mesa_symbol_table_add_global_symbol(struct _mesa_symbol_table *table,
 
     if (hdr == NULL) {
         hdr = calloc(1, sizeof(*hdr));
-        hdr->name = strdup(name);
+        hdr->name = _strdup(name);
 
         hash_table_insert(table->ht, hdr, hdr->name);
         hdr->next = table->hdr;

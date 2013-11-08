@@ -98,6 +98,7 @@ static bool saveFile(const char* filename, const char* data)
    return true;
 }
 
+#ifndef GLSL2AGAL_LIB
 const char* compileShader(const char* src, int mode, bool optimize, bool gles);
 
 int
@@ -160,6 +161,7 @@ main(int argc, char **argv)
 
    return 0;
 }
+#endif
 
 //extern "C" void compileShader()  __attribute__((used, annotate("as3sig:public function compileShader(src:String, mode:int, optimize:Boolean, gles:Boolean = false):String")));
 
@@ -203,4 +205,15 @@ const char* compileShader(const char* src, int mode, bool optimize, bool gles)
    //);
 
    //AS3_ReturnAS3Var(outputstr);
+}
+
+void compileShader(const char* inFilename, const char* outFilename, int mode, bool optimize, bool gles) {
+	const char* originalShader = loadFile(inFilename);
+	if (!originalShader)
+		abort();
+
+	const char *optimizedShader = compileShader(originalShader, mode, optimize, gles);
+	
+	if (!saveFile(outFilename, optimizedShader))
+		abort();
 }

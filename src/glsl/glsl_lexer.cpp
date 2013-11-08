@@ -1058,7 +1058,7 @@ static int classify_identifier(struct _mesa_glsl_parse_state *, const char *);
 			  "Illegal use of reserved word `%s'", yytext);	\
 	 return ERROR_TOK;						\
       } else {								\
-	 yylval->identifier = strdup(yytext);				\
+	 yylval->identifier = _strdup(yytext);				\
 	 return classify_identifier(yyextra, yytext);			\
       }									\
    } while (0)
@@ -1536,7 +1536,7 @@ case 18:
 YY_RULE_SETUP
 #line 166 "src/glsl/glsl_lexer.ll"
 {
-				   yylval->identifier = strdup(yytext);
+				   yylval->identifier = _strdup(yytext);
 				   return IDENTIFIER;
 				}
 	YY_BREAK
@@ -1940,7 +1940,7 @@ YY_RULE_SETUP
 		      || yyextra->ARB_fragment_coord_conventions_enable) {
 		      return LAYOUT_TOK;
 		   } else {
-		      yylval->identifier = strdup(yytext);
+		      yylval->identifier = _strdup(yytext);
 		      return IDENTIFIER;
 		   }
 		}
