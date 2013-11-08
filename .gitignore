@@ -58,3 +58,9 @@ bin-debug
 bin-release
 .settings/
 .pydevproject
+/Debug
+/Release
+
+/Glsl2Agal.sdf
+
+/Glsl2Agal.opensdf
