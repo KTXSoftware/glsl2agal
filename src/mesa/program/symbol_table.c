@@ -25,6 +25,10 @@
 #include "symbol_table.h"
 #include "hash_table.h"
 
+#ifndef SYS_WINDOWS
+#define _strdup strdup
+#endif
+
 struct symbol {
     /**
      * Link to the next symbol in the table with the same name

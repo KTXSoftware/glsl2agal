@@ -76,6 +76,10 @@ extern "C" {
 #include "main/shaderobj.h"
 }
 
+#ifndef SYS_WINDOWS
+#define _strdup strdup
+#endif
+
 /**
  * Visitor that determines whether or not a variable is ever written.
  */

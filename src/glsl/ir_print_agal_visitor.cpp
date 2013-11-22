@@ -687,7 +687,7 @@ void ir_print_agal_visitor::visit(ir_assignment *ir)
 			case ir_binop_dot:
       			ec1 = countElements(op1);
       			ec2 = countElements(op2);
-      			readComponents = expr->operation == ir_binop_dot ? min(ec1,ec2) : 0;
+      			readComponents = expr->operation == ir_binop_dot ? fmin(ec1,ec2) : 0;
       			ralloc_asprintf_append (&buffer, (readComponents == 3) ? "dp3 " : "dp4 ");
       			isBinOp=true;
 				break;
@@ -743,7 +743,7 @@ void ir_print_agal_visitor::visit(ir_assignment *ir)
       		isBinOp = true;
       		int ec1 = countElements(op1);
       		int ec2 = countElements(op2);
-      		readComponents = min(ec1,ec2); 
+      		readComponents = fmin(ec1,ec2);
       		ralloc_asprintf_append (&buffer, (readComponents == 3) ? "dp3 " : "dp4 ");
       	}
       	else if(strcmp(name, "pow") == 0)       { ralloc_asprintf_append (&buffer, "pow "); op1 = (ir_instruction*)args.get(); args.next(); op2 = (ir_instruction*)args.get(); isBinOp = true; }

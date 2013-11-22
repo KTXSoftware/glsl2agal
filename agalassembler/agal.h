@@ -56,7 +56,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace AGAL {	
 
-#if defined(_WIN32) || defined(_MAC) || defined(UNIX)
+#if defined(SYS_WINDOWS) || defined(SYS_OSX) || defined(SYS_LINUX)
 	#pragma pack(push,1)
 #else
 	#error use the correct packing pragma for your platform
@@ -222,7 +222,7 @@ namespace AGAL {
 		};
 	}; 
 
-#if defined(_WIN32) || defined(_MAC) || defined(UNIX)
+#if defined(SYS_WINDOWS) || defined(SYS_OSX) || defined(SYS_LINUX)
 	#pragma pack(pop)
 #else
 	#error use the correct packing pragma for your platform
